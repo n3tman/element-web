@@ -20,6 +20,10 @@ export interface UserInfoVerificationSectionState {
     canVerify: boolean;
     hasCrossSigningKeys: boolean | undefined;
     /**
+     * true while the verification status, the devices or the cross-signing keys are still being fetched
+     */
+    isLoading: boolean;
+    /**
      * used to display correct badge value
      */
     isUserVerified: boolean;
@@ -29,19 +33,11 @@ export interface UserInfoVerificationSectionState {
     verifySelectedUser: () => void;
 }
 
-const useHasCrossSigningKeys = (
-    cli: MatrixClient,
-    member: User,
-    isLoading: boolean,
-    canVerify: boolean,
-): boolean | undefined => {
+const useHasCrossSigningKeys = (cli: MatrixClient, member: User, canVerify: boolean): boolean | undefined => {
     return useAsyncMemo(async () => {
-        // Undefined only while we are still loading. Once we know the user can't be verified
-        // (for example because they have no devices), there are no keys to wait for.
-        if (isLoading) return undefined;
-        if (!canVerify) return false;
+        if (!canVerify) return undefined;
         return cli.getCrypto()?.userHasCrossSigningKeys(member.userId, true);
-    }, [cli, member, isLoading, canVerify]);
+    }, [cli, member, canVerify]);
 };
 
 /**
@@ -66,14 +62,17 @@ export const useUserInfoVerificationViewModel = (
     const isUserVerified = Boolean(userTrust?.isVerified());
     const isMe = member.userId === sdkContext.client!.getUserId();
     const canVerify = hasUserVerificationStatus && !isUserVerified && !isMe && !!devices?.length;
-    const isLoading = !hasUserVerificationStatus || devices === undefined;
 
-    const hasCrossSigningKeys = useHasCrossSigningKeys(sdkContext.client!, member as User, isLoading, canVerify);
+    const hasCrossSigningKeys = useHasCrossSigningKeys(sdkContext.client!, member as User, canVerify);
+    // the cross-signing keys are only fetched for a user we can verify
+    const isLoading =
+        !hasUserVerificationStatus || devices === undefined || (canVerify && hasCrossSigningKeys === undefined);
     const verifySelectedUser = (): void => verifyUser(sdkContext.rightPanelStore, sdkContext.client!, member as User);
 
     return {
         canVerify,
         hasCrossSigningKeys,
+        isLoading,
         isUserVerified,
         verifySelectedUser,
     };
