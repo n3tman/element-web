@@ -1140,10 +1140,11 @@ export class RoomView extends React.Component<IRoomProps, IRoomState> {
     }
 
     private onRightPanelStoreUpdate = (): void => {
-        const { roomId } = this.state;
-        this.setState({
+        // Read the room from the pending state: the store can update before the state that sets the room is applied,
+        // such as when a fetched permalink event opens a thread straight after the room view's first update
+        this.setState(({ roomId }) => ({
             showRightPanel: roomId ? this.context.rightPanelStore.isOpenForRoom(roomId) : false,
-        });
+        }));
     };
 
     private onPageUnload = (event: BeforeUnloadEvent): string | undefined => {

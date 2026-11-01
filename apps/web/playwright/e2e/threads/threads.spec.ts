@@ -5,11 +5,14 @@ Copyright 2023 The Matrix.org Foundation C.I.C.
 SPDX-License-Identifier: AGPL-3.0-only OR GPL-3.0-only OR LicenseRef-Element-Commercial
 Please see LICENSE files in the repository root for full details.
 */
+import type { Page } from "@playwright/test";
+
 import { SettingLevel } from "../../../src/settings/SettingLevel";
 import { Layout } from "../../../src/settings/enums/Layout";
 import { test, expect } from "../../element-web-test";
 import { isDendrite } from "../../plugins/homeserver/dendrite";
 import { getSampleFilePath } from "../../sample-files";
+import { type Bot } from "../../pages/bot";
 
 test.describe("Threads", () => {
     test.skip(isDendrite, "due to a Dendrite bug https://github.com/element-hq/dendrite/issues/3489");
@@ -644,4 +647,47 @@ test.describe("Threads", () => {
         expect(threadHeaderBox?.height).toBe(pinnedBannerBox?.height);
         await expect(threadPanelHeader).toHaveCSS("height", "64px");
     });
+
+    test("opens a thread the room has not loaded when following a permalink to one of its replies from another room", async ({
+        page,
+        app,
+        user,
+        bot,
+    }) => {
+        const { roomId, replyId } = await createRoomWithLongThread(bot, user.userId);
+        await app.client.joinRoom(roomId);
+        const otherRoomId = await app.client.createRoom({ name: "Elsewhere" });
+
+        // Follow the permalink from another room without opening the room first, so the room knows neither
+        // the thread nor the reply
+        await page.goto("/#/room/" + otherRoomId);
+        await expect(page.locator(".mx_RoomHeader").getByText("Elsewhere")).toBeVisible();
+        await page.goto(`/#/room/${roomId}/${replyId}`);
+
+        await expectReplyHighlightedInThread(page, replyId);
+    });
 });
+
+/**
+ * Has the bot write a room before the user joins, so the user's client only loads what it is shown: a thread with
+ * more replies than the thread's first page holds (30), then the main timeline.
+ */
+async function createRoomWithLongThread(bot: Bot, userId: string): Promise<{ roomId: string; replyId: string }> {
+    const roomId = await bot.createRoom({ name: "Weekend plans", invite: [userId] });
+    const { event_id: rootId } = await bot.sendMessage(roomId, "Who is coming on the hike?");
+    const { event_id: replyId } = await bot.sendMessage(roomId, "I am bringing the packing list", rootId);
+    for (let i = 2; i <= 40; i++) {
+        await bot.sendMessage(roomId, `Reply ${i}`, rootId);
+    }
+    for (let i = 1; i <= 30; i++) {
+        await bot.sendMessage(roomId, `Main timeline message ${i}`);
+    }
+    return { roomId, replyId };
+}
+
+async function expectReplyHighlightedInThread(page: Page, replyId: string): Promise<void> {
+    const reply = page.locator(`.mx_ThreadView .mx_EventTile[data-event-id="${replyId}"]`);
+    await expect(reply).toBeVisible();
+    await expect(reply).toHaveClass(/stateSelected/);
+    await expect(page.getByRole("dialog", { name: "Failed to load timeline position" })).not.toBeVisible();
+}

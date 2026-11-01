@@ -23,6 +23,7 @@ import {
     RoomMember,
     RoomStateEvent,
     SearchResult,
+    type Thread,
     User,
 } from "matrix-js-sdk/src/matrix";
 import { type CryptoApi, CryptoEvent, UserVerificationStatus } from "matrix-js-sdk/src/crypto-api";
@@ -73,6 +74,7 @@ import MediaDeviceHandler, { MediaDeviceKindEnum } from "../../MediaDeviceHandle
 import Modal, { type ComponentProps } from "../../Modal.tsx";
 import ErrorDialog from "../views/dialogs/ErrorDialog.tsx";
 import * as pinnedEventHooks from "../../hooks/usePinnedEvents";
+import * as EventUtils from "../../utils/EventUtils";
 import { TimelineRenderingType } from "../../contexts/RoomContext";
 import { ModuleApi } from "../../modules/Api";
 import MatrixClientBackedController from "../../settings/controllers/MatrixClientBackedController.ts";
@@ -129,6 +131,7 @@ describe("RoomView", () => {
         // Can't vi.restoreAllMocks() because some tests will break
         vi.spyOn(pinnedEventHooks, "usePinnedEvents").mockRestore();
         vi.spyOn(pinnedEventHooks, "useSortedFetchedPinnedEvents").mockRestore();
+        vi.spyOn(EventUtils, "fetchInitialEvent").mockRestore();
 
         cleanup();
     });
@@ -652,6 +655,52 @@ describe("RoomView", () => {
 
             expect(stores.rightPanelStore.isOpen).toEqual(true);
             expect(stores.rightPanelStore.currentCard.phase).toEqual(RightPanelPhases.Timeline);
+        });
+    });
+
+    describe("following a link to a thread reply that has to be fetched", () => {
+        it("shows the right panel when the store opens it before the room view's first update is applied", async () => {
+            vi.spyOn(room, "getMyMembership").mockReturnValue(KnownMembership.Join);
+            const rootEvent = mkEvent({
+                event: true,
+                type: EventType.RoomMessage,
+                user: "@alice:example.org",
+                room: room.roomId,
+                content: {},
+            });
+            const reply = mkEvent({
+                event: true,
+                type: EventType.RoomMessage,
+                user: "@alice:example.org",
+                room: room.roomId,
+                content: {},
+            });
+            vi.spyOn(reply, "getThread").mockReturnValue({ rootEvent } as Thread);
+            let resolveFetch!: (event: MatrixEvent) => void;
+            vi.spyOn(EventUtils, "fetchInitialEvent").mockImplementation(
+                () => new Promise((resolve) => (resolveFetch = resolve)),
+            );
+
+            // A link from another room: the room view mounts with the reply still being fetched
+            await act(() =>
+                stores.roomViewStore.viewRoom({
+                    action: Action.ViewRoom,
+                    room_id: room.roomId,
+                    event_id: reply.getId(),
+                    highlighted: true,
+                    metricsTrigger: undefined,
+                }),
+            );
+            await mountRoomView();
+
+            // Opening the thread updates the right panel store while React still holds the update that sets the room
+            await act(async () => {
+                resolveFetch(reply);
+                for (let i = 0; i < 5; i++) await Promise.resolve();
+                stores.rightPanelStore.setCard({ phase: RightPanelPhases.RoomSummary }, true, room.roomId);
+            });
+
+            await expect(screen.findByTestId("right-panel")).resolves.toBeTruthy();
         });
     });
 
