@@ -8,7 +8,7 @@ Please see LICENSE files in the repository root for full details.
 
 import {
     EventStatus,
-    MatrixEvent,
+    type MatrixEvent,
     EventType,
     EVENT_VISIBILITY_CHANGE_TYPE,
     MsgType,
@@ -222,11 +222,13 @@ export async function fetchInitialEvent(
     roomId: string,
     eventId: string,
 ): Promise<MatrixEvent | null> {
+    const mapper = client.getEventMapper();
     let initialEvent: MatrixEvent | null;
 
     try {
         const eventData = await client.fetchRoomEvent(roomId, eventId);
-        initialEvent = new MatrixEvent(eventData);
+        // The mapper attaches the event to its thread if the room already knows that thread
+        initialEvent = mapper(eventData);
     } catch {
         logger.warn("Could not find initial event: " + eventId);
         initialEvent = null;
@@ -235,7 +237,6 @@ export async function fetchInitialEvent(
     if (client.supportsThreads() && initialEvent?.isRelation(THREAD_RELATION_TYPE.name) && !initialEvent.getThread()) {
         const threadId = initialEvent.threadRootId!;
         const room = client.getRoom(roomId);
-        const mapper = client.getEventMapper();
         const rootEvent = room?.findEventById(threadId) ?? mapper(await client.fetchRoomEvent(roomId, threadId));
         try {
             room?.createThread(threadId, rootEvent, [initialEvent], true);

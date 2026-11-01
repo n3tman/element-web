@@ -648,6 +648,30 @@ test.describe("Threads", () => {
         await expect(threadPanelHeader).toHaveCSS("height", "64px");
     });
 
+    test("opens the thread at a reply that was not loaded when following a permalink to it", async ({
+        page,
+        app,
+        user,
+        bot,
+    }) => {
+        const { roomId, replyId } = await createRoomWithLongThread(bot, user.userId);
+        await app.client.joinRoom(roomId);
+        const otherRoomId = await app.client.createRoom({ name: "Elsewhere" });
+
+        // Open the room and its thread list, so the room knows the thread but not its first reply
+        await page.goto("/#/room/" + roomId);
+        await expect(page.locator(".mx_RoomView_body").getByText("Main timeline message 30")).toBeVisible();
+        await page.locator(".mx_RoomHeader").getByRole("button", { name: "Threads" }).click();
+        await expect(page.locator(".mx_ThreadPanel").getByText("Who is coming on the hike?")).toBeVisible();
+
+        // Leave the room, then follow a permalink to the first reply
+        await page.goto("/#/room/" + otherRoomId);
+        await expect(page.locator(".mx_RoomHeader").getByText("Elsewhere")).toBeVisible();
+        await page.goto(`/#/room/${roomId}/${replyId}`);
+
+        await expectReplyHighlightedInThread(page, replyId);
+    });
+
     test("opens a thread the room has not loaded when following a permalink to one of its replies from another room", async ({
         page,
         app,

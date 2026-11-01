@@ -21,6 +21,7 @@ import {
     Room,
     Thread,
 } from "matrix-js-sdk/src/matrix";
+import { eventMapperFor } from "matrix-js-sdk/src/event-mapper";
 import { vi, describe, it, expect, beforeEach, afterAll } from "vitest";
 import { getMockClientWithEventEmitter, makeBeaconInfoEvent, makePollStartEvent, stubClient } from "test-utils";
 
@@ -431,6 +432,17 @@ describe("EventUtils", () => {
         it("creates a thread when needed", async () => {
             await fetchInitialEvent(client, room.roomId, THREAD_REPLY);
             expect(room.getThread(THREAD_ROOT)).toBeInstanceOf(Thread);
+        });
+
+        it("attaches the event to a thread the room already has", async () => {
+            vi.spyOn(client, "getEventMapper").mockReturnValue(
+                eventMapperFor(client, { preventReEmit: true, decrypt: false }),
+            );
+            const thread = room.createThread(THREAD_ROOT, new MatrixEvent(events[THREAD_ROOT]), [], true);
+
+            const initialEvent = await fetchInitialEvent(client, room.roomId, THREAD_REPLY);
+
+            expect(initialEvent?.getThread()).toBe(thread);
         });
     });
 
