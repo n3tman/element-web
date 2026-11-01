@@ -719,7 +719,8 @@ export class RoomView extends React.Component<IRoomProps, IRoomState> {
             SettingsStore.watchSetting("showRedactions", roomId, (...[, , , value]) =>
                 this.setState({ showRedactions: value! }),
             ),
-            SettingsStore.watchSetting("showJoinLeaves", roomId, (...[, , , value]) =>
+            // The final value, not the changed level's: a per-room override outranks the account setting
+            SettingsStore.watchSetting("showJoinLeaves", roomId, (...[, , , , value]) =>
                 this.setState({ showJoinLeaves: value! }),
             ),
             SettingsStore.watchSetting("showAvatarChanges", roomId, (...[, , , value]) =>

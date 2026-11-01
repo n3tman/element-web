@@ -195,8 +195,9 @@ export default class SettingsStore {
                 );
                 return;
             }
-            const newValue = SettingsStore.getValue(settingName);
-            const newValueAtLevel = SettingsStore.getValueAt(atLevel, settingName) ?? newValAtLevel;
+            // Resolve in the watched room, so that room-level overrides are taken into account
+            const newValue = SettingsStore.getValue(settingName, roomId);
+            const newValueAtLevel = SettingsStore.getValueAt(atLevel, settingName, roomId) ?? newValAtLevel;
             callbackFn(settingName, changedInRoomId, atLevel, newValueAtLevel, newValue);
         };
 
