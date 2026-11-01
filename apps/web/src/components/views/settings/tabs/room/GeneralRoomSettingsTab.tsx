@@ -20,6 +20,7 @@ import { SettingsSubsection } from "../../shared/SettingsSubsection";
 import SettingsTab from "../SettingsTab";
 import { SettingsSection } from "../../shared/SettingsSection";
 import { MediaPreviewAccountSettings } from "../user/MediaPreviewAccountSettings";
+import { JoinLeaveRoomSetting } from "./JoinLeaveRoomSetting";
 
 interface IProps {
     room: Room;
@@ -87,6 +88,9 @@ export default class GeneralRoomSettingsTab extends React.Component<IProps, ISta
                 <SettingsSection heading={_t("room_settings|general|other_section")}>
                     <SettingsSubsection heading={_t("common|moderation_and_safety")} legacy={false}>
                         <MediaPreviewAccountSettings roomId={room.roomId} />
+                    </SettingsSubsection>
+                    <SettingsSubsection heading={_t("common|timeline")} legacy={false}>
+                        <JoinLeaveRoomSetting roomId={room.roomId} />
                     </SettingsSubsection>
                     {leaveSection}
                 </SettingsSection>
