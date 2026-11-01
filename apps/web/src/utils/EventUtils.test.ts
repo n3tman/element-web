@@ -444,6 +444,24 @@ describe("EventUtils", () => {
 
             expect(initialEvent?.getThread()).toBe(thread);
         });
+
+        it("attaches the event to a thread the room creates while the event is fetched", async () => {
+            vi.spyOn(client, "getEventMapper").mockReturnValue(
+                eventMapperFor(client, { preventReEmit: true, decrypt: false }),
+            );
+            let thread: Thread | undefined;
+            vi.spyOn(client, "fetchRoomEvent").mockImplementation(async (roomId, eventId) => {
+                if (eventId === THREAD_ROOT) {
+                    thread = room.createThread(THREAD_ROOT, new MatrixEvent(events[THREAD_ROOT]), [], true);
+                }
+                return events[eventId] ?? Promise.reject();
+            });
+
+            const initialEvent = await fetchInitialEvent(client, room.roomId, THREAD_REPLY);
+
+            expect(thread).toBeInstanceOf(Thread);
+            expect(initialEvent?.getThread()).toBe(thread);
+        });
     });
 
     describe("findEditableEvent", () => {
